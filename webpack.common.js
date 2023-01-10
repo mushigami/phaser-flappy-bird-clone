@@ -55,6 +55,9 @@ module.exports = {
           to: path.resolve(__dirname, 'build/assets')
         }
       ],
+    }),
+    new webpack.ProvidePlugin({
+      process: 'process/browser' 
     })
   ],
 };
