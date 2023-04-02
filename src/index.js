@@ -1,83 +1,122 @@
 
-import Phaser from "phaser";
+
+import Phaser from 'phaser';
 
 const config = {
+  // WebGL (Web graphics library) JS Api for rendering 2D and 3D graphics
   type: Phaser.AUTO,
   width: 800,
   height: 600,
   physics: {
+    // Arcade physics plugin, manages physics simulation
     default: 'arcade',
     arcade: {
       debug: true,
-      //gravity: { y: 300 } to apply it only to the bird
     }
   },
   scene: {
-    preload: preload,
-    create: create,
-    update: update,
+    preload,
+    create,
+    update
   }
-};
-
+}
 
 const VELOCITY = 200;
-const FLAP_VELOCITY = 250;
-const initialBirdPosition = {x: config.width * 0.1, y:config.height/2 }
+const PIPES_TO_RENDER = 4;
 
 let bird = null;
-let pipes = [];
-let totalDelta = null;
-let outOfBounds = false;
-const pipeVerticalDistanceRange = [100, 300];
-let pipeVerticalDistance = Phaser.Math.Between(...pipeVerticalDistanceRange);
+let pipes = null;
 
-function preload () {
-  // this context - scene
-  // contains functions and properties we can use
+let pipeHorizontalDistance = 0;
+
+const pipeVerticalDistanceRange = [150, 250];
+const pipeHorizontalDistanceRange = [400, 600];
+
+const flapVelocity = 250;
+const initalBirdPosition = {x: config.width * 0.1, y: config.height / 2}
+
+function preload() {
   this.load.image('sky', 'assets/sky.png');
   this.load.image('bird', 'assets/bird.png');
   this.load.image('pipe', 'assets/pipe.png');
-  
 }
 
-function create () {
-  // x y 'sky'--> key of the image
+function create() {
+  this.add.image(0, 0, 'sky').setOrigin(0);
+  bird = this.physics.add.sprite(initalBirdPosition.x, initalBirdPosition.y, 'bird').setOrigin(0);
+  bird.body.gravity.y = 400;
 
-  this.add.image(0,0,'sky').setOrigin(0,0); // 0 to 1
-  bird = this.physics.add.sprite(initialBirdPosition.x, initialBirdPosition.y, 'bird').setOrigin(0);
-  bird.body.gravity.y = 300;
-  
-  pipes.push(this.physics.add.sprite(400, 100, 'pipe').setOrigin(0,1));
-  pipes.push(this.physics.add.sprite(400, pipeVerticalDistance + pipes[0].y, 'pipe').setOrigin(0));
+  pipes = this.physics.add.group();
 
-  this.input.on('pointerdown',flap);
-  this.input.keyboard.on('keydown-SPACE', flap); 
-  console.log(bird.body)
-  debugger
+  for (let i = 0; i < PIPES_TO_RENDER; i++) {
+    const upperPipe = pipes.create(0, 0, 'pipe').setOrigin(0, 1);
+    const lowerPipe = pipes.create(0, 0, 'pipe').setOrigin(0, 0);
 
-}
-
-// 60fps 
-// 60 times per second it's called
-function update(time, delta){
-  if(checkOutOfBounds()){
-    restartBirdPosition();
+    placePipe(upperPipe, lowerPipe)
   }
+
+  pipes.setVelocityX(-200);
+
+  this.input.on('pointerdown', flap);
+  this.input.keyboard.on('keydown-SPACE', flap);
 }
 
-//------HELPER FUNCTIONS-----//
-function flap(){
-  bird.body.velocity.y = -FLAP_VELOCITY;
+// if bird y position is small than 0 or greater than height of the canvas
+// then alert "you have lost"
+function update(time, delta) {
+ if (bird.y > config.height || bird.y < -bird.height) {
+  restartBirdPosition();
+ }
+
+ recyclePipes();
 }
 
-function checkOutOfBounds(){
-  return( (bird.y > config.height || bird.y < 0) ? true: false)
+function placePipe(uPipe, lPipe) {
+
+  const rightMostXPos = getRightMostPipe();
+
+  const pipeVerticalDistance = Phaser.Math.Between(...pipeVerticalDistanceRange);
+  const pipeVerticalPosition = Phaser.Math.Between(0 + 20, config.height - 20 - pipeVerticalDistance);
+  const pipeHorizontalDistance = Phaser.Math.Between(...pipeHorizontalDistanceRange);
+
+  uPipe.x = rightMostXPos + pipeHorizontalDistance;
+  uPipe.y = pipeVerticalPosition;
+
+  lPipe.x = uPipe.x;
+  lPipe.y = uPipe.y + pipeVerticalDistance
 }
 
-function restartBirdPosition(){
-  bird.x = initialBirdPosition.x;
-  bird.y = initialBirdPosition.y;
+function recyclePipes(){
+  const tempPipes = [];
+  pipes.getChildren().forEach(pipe => {
+    if(pipe.getBounds().right <= 0){
+      //recycle pipe
+      tempPipes.push(pipe);
+      if(tempPipes.length === 2){
+        placePipe(...tempPipes);
+      }
+    }
+  })
+
+}
+
+function getRightMostPipe() {
+  let rightMostX = 0;
+  pipes.getChildren().forEach(function(pipe){
+    rightMostX = Math.max(pipe.x, rightMostX);
+
+  })
+  return rightMostX
+}
+
+function restartBirdPosition() {
+  bird.x = initalBirdPosition.x;
+  bird.y = initalBirdPosition.y;
   bird.body.velocity.y = 0;
+}
+
+function flap() {
+  bird.body.velocity.y = -flapVelocity;
 }
 
 
